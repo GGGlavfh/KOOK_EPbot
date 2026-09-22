@@ -36,3 +36,5 @@ TOKEN = os.environ.get(TOKEN_ENV) or CONFIG.get('token', '')
 CACHE_TTL = CONFIG.get('admin_cache_ttl', 300)
 # 刷新失败时旧值最多还能再用多久（秒）：硬上限，超过就按「不是管理员」处理（失败关闭）
 CACHE_STALE_GRACE = CONFIG.get('admin_cache_stale_grace', 3600)
+# 绑定验证码的兜底有效期（秒）：Java 端没写 code_expires_at 时用 created_at + 它判过期
+BIND_CODE_TTL = CONFIG.get('bind_code_ttl', 900)

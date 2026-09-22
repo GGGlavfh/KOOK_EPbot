@@ -7,9 +7,10 @@ import asyncio
 
 from khl import Message
 
-from .admin import is_guild_admin
+from .admin import is_admin, is_guild_admin
+from .bind.bind_manager import setup as setup_bind
 from .bot import bot
-from .commands import ADMIN_ONLY
+from .commands import ADMIN_ONLY, PUBLIC_ONLY
 from .paths import ensure_data_dir
 from .ticket.ticket_manager import setup as setup_ticket
 from .welcome.welcome import setup as setup_welcome
@@ -19,6 +20,8 @@ HELP_TEXT = (
     "/help - 显示帮助信息\n"
     "/welcome on/off - 开关欢迎功能\n"
     "/ticket on/off - 开关工单功能\n"
+    "/bind <验证码> - 绑定游戏账号（在绑定频道，所有成员可用）\n"
+    "/bind channel / off - 设置或关闭绑定频道（管理员）\n"
 )
 
 
@@ -38,6 +41,10 @@ def register():
 
     # 工单功能（epbot/ticket/ticket_manager.py）
     setup_ticket(bot, ADMIN_ONLY, is_guild_admin)
+
+    # 跨平台绑定（epbot/bind/bind_manager.py）
+    # 注意传的是 PUBLIC_ONLY：/bind 对普通成员开放，管理员校验在指令内部单独做
+    setup_bind(bot, PUBLIC_ONLY, is_admin)
 
 
 def run():

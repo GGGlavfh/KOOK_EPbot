@@ -27,5 +27,7 @@ version = {attr = "epbot.__version__"}
 [tool.setuptools.package-data]
 # 按钮/文案配置跟着代码走。config.json 故意不打包：它含 Token，由部署方自己提供
 "epbot.ticket" = ["ticket_config.json"]
+# 绑定功能的表结构契约，Python 启动时执行它，Java 端也照着它建表
+"epbot.bind" = ["schema.sql"]
 # 配置模板要随包发布，装机后照着它建 config.json
 "epbot" = ["config.example.json"]

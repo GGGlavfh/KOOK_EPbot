@@ -35,7 +35,8 @@ KOOK_EPbot-1.0/
 ├── venv/                # 本地虚拟环境（体积大，不要提交）
 ├── data/                # 运行时可写数据（不在包里）
 │   ├── welcome_channels.json  # 欢迎开关 {guild_id: channel_id}
-│   └── ticket_state.json      # 面板频道与工单归属
+│   ├── ticket_state.json      # 面板频道与工单归属
+│   └── bind.db                # 跨平台绑定（SQLite，游戏服与机器人共写同一文件）
 └── src/
     └── epbot/
         ├── __init__.py   # 包说明 + __version__（版本号唯一来源）
@@ -51,6 +52,11 @@ KOOK_EPbot-1.0/
         ├── welcome/
         │   ├── __init__.py
         │   └── welcome.py          # /welcome 指令 + 入服事件
+        ├── bind/
+        │   ├── __init__.py
+        │   ├── schema.sql          # 表结构契约（**两端共用**，Java 端照它建表）
+        │   ├── bind_db.py          # 数据层：唯一碰 SQL 的地方（claim / 绑定频道读写）
+        │   └── bind_manager.py     # /bind 指令与回复
         └── ticket/
             ├── __init__.py
             ├── ticket_config.json  # 按钮名字与 value 暗号、频道前缀等（跟代码走）
@@ -77,13 +83,15 @@ KOOK_EPbot-1.0/
 
 | 模块 | 内容 |
 | --- | --- |
-| `paths.py` | `PACKAGE_DIR` / `PROJECT_ROOT` / `CONFIG_PATH` / `DATA_DIR` 及三个文件路径、`ensure_data_dir()` |
-| `config.py` | 读取 `config.json`，导出 `TOKEN_ENV` / `TOKEN`（环境变量优先）、`ADMIN_PERMISSION_BIT`、`CACHE_TTL` |
+| `paths.py` | `PACKAGE_DIR` / `PROJECT_ROOT` / `CONFIG_PATH` / `DATA_DIR` 及各状态文件路径、`ensure_data_dir()` |
+| `config.py` | 读取 `config.json`，导出 `TOKEN_ENV` / `TOKEN`（环境变量优先）、`ADMIN_PERMISSION_BIT`、`CACHE_TTL`、`BIND_CODE_TTL` |
 | `bot.py` | 全局 `bot` 单例 |
-| `common.py` | `read_json` / `write_json_atomic` / `is_channel_gone` / `channel_alive` / `TTLCache` |
+| `common.py` | `read_json` / `write_json_atomic` / `TTLCache` / `channel_state`（三态频道探测） |
 | `admin.py` | 三个 `TTLCache`（软/硬两层 TTL）；`is_admin` / `is_guild_admin` / `admin_only` |
-| `commands.py` | `admin_rule`（规则）、`on_rule_not_passed` / `on_arg_len_not_matched`（异常处理）、`COMMAND_USAGE`、`ADMIN_ONLY` |
-| `main.py` | `register()` 注册 `/help` 与两个功能模块；`run()` 启动 |
+| `commands.py` | `admin_rule`（规则）、`on_rule_not_passed` / `on_arg_len_not_matched`（异常处理）、`COMMAND_USAGE`、`ADMIN_ONLY`、`PUBLIC_ONLY` |
+| `bind/bind_db.py` | 绑定数据层：`init_schema()` / `claim()` / `get_bind_channel()` / `set_bind_channel()` / `clear_bind_channel()` |
+| `bind/bind_manager.py` | `/bind` 指令（验证码 + `channel` / `off` 子命令）；回复走 `temp_target_id` 只发给本人 |
+| `main.py` | `register()` 注册 `/help` 与三个功能模块；`run()` 启动 |
 
 ## 管理员判定逻辑
 
@@ -404,6 +412,162 @@ khl.py 派发消息/事件是 `asyncio.ensure_future`，**多个用户同时点�
 
 > 若 `random.choice`，长度为 6 的列表在前 6 次里出现重屴的概率约 60%，所以不能偷懒。
 > 袋子状态只存内存，重启后会重新开始一轮。
+
+## 跨平台绑定（epbot/bind/）
+
+把 KOOK 账号与游戏服账号对应起来。**两端共享同一个 SQLite 文件**，所以约定很硬：表结构就是接口。
+
+| 文件 | 职责 |
+| --- | --- |
+| `schema.sql` | 表结构契约。Python 端启动时执行它；Java 端照它建表（同一份文件直接拿去用） |
+| `bind_db.py` | 数据层，唯一碰 SQL 的地方；`claim()` 封装了整个兑换过程 |
+| `bind_manager.py` | `/bind` 指令与业务回复 |
+
+### 数据流
+
+1. **Java 端**生成验证码 → 写入一行（`external_id` + `code`，`kook_id` 留空）
+2. 玩家在绑定频道发 `/bind <验证码>`
+3. `bind_db.claim()` 校验 → 清掉 `code` → 写入 `kook_id` 与 `bound_at`
+4. Java 端自己查这一行（`kook_id` 不为空即绑定成功）
+
+Python 端**不主动通知** Java 端，Java 端也不需要轮询机器人 —— 它只读自己写的库。
+
+### 表结构
+
+`bindings`（一行 = 一个游戏账号的绑定状态）：
+
+| 列 | 语义 |
+| --- | --- |
+| `id` | 自增主键（业务上不用） |
+| `external_id` | 游戏服侧的用户 id，**Java 端自己定格式** |
+| `code` | 待兑换的验证码；绑定成功或过期后置 `NULL` |
+| `code_expires_at` | 可选：过期时间戳（秒）。为空则用 `created_at + bind_code_ttl` 兜底 |
+| `kook_id` | KOOK 用户 id，`NULL` = 尚未绑定 |
+| `created_at` | 创建时间戳（秒），`NOT NULL` |
+| `bound_at` | 绑定成功时间戳（秒），`NULL` = 未绑定 |
+
+`bind_channels`（`guild_id` → 绑定频道，`/bind channel` 写入）。
+
+### 三条唯一索引与「一对一」
+
+| 索引 | 作用 | 以后要放开时 |
+| --- | --- | --- |
+| `ux_bindings_code` | 验证码不重复（部分索引，`code IS NOT NULL`） | 基本不用动 |
+| `ux_bindings_kook` | **一对一**：一个 KOOK 账号只能绑一次 | 想支持「一个 KOOK 绑多个游戏账号」，**删掉这个索引**即可，其它逻辑不用改 |
+| `ux_bindings_external` | 一个游戏账号同时只有一条记录 | — |
+
+因为 `ux_bindings_external` 存在，**Java 端给同一个人重发验证码必须用 UPSERT，不能直接 INSERT**，否则撞唯一索引报错：
+
+```sql
+INSERT INTO bindings(external_id, code, code_expires_at, created_at)
+VALUES(?, ?, ?, ?)
+ON CONFLICT(external_id) DO UPDATE SET
+    code            = excluded.code,
+    code_expires_at = excluded.code_expires_at,
+    created_at      = excluded.created_at
+WHERE bindings.kook_id IS NULL;   -- 已绑定过的行不动（补发的码不能用来改绑）
+```
+
+### 并发与事务
+
+Java 端和机器人是两个进程，可能同时读写同一个文件：
+
+- 连接时开 `journal_mode=WAL` + `busy_timeout=5000`（写在 `_connect()` 里），否则直接抛 `database is locked`
+- 每次操作开一个新连接、自动提交，**不留长事务**（不留着锁）
+- 兑换用**带条件的单条 UPDATE**（`WHERE ... AND code IS NOT NULL AND kook_id IS NULL`）做原子抢占，
+  `rowcount != 1` 即说明被并发抢走了 —— 先 SELECT 再 UPDATE 会让两个请求同时成功
+
+已验证：两个线程同时兑同一个码，结果恰好一个 `OK`、另一个 `NOT_FOUND`。
+
+### 过期与清理
+
+- 判过期：`code_expires_at` 优先，为空则回退到 `created_at + BIND_CODE_TTL`（配置项 `bind_code_ttl`，默认 900 秒）
+- **整行删除**，而不是只清 `code`：否则会留下永远对不上的空行
+- 兑换成功后 `code` / `code_expires_at` 置 `NULL`（即需求里的「删除临时验证码」）
+
+### 指令为什么用 PUBLIC_ONLY
+
+`/bind` 面向普通成员，**不能**套 `ADMIN_ONLY`（那会让非管理员的调用被静默吞掉）。注册时传
+`commands.PUBLIC_ONLY`（只挂参数错误提示、无 `rules`），管理员校验在指令内部对
+`channel` / `off` 两个子命令单独做。所有回复走 `send(..., temp_target_id=用户id)`，只发给发起者本人。
+
+### Java 端接入示例
+
+依赖 `org.xerial:sqlite-jdbc`（Maven：`org.xerial:sqlite-jdbc:3.46.1.3`，版本不太老即可）。
+
+```java
+import java.sql.*;
+
+public class BindStore {
+    private final String url;
+
+    /** dbPath 要和 Python 端一致，默认是 <仓库根>/data/bind.db */
+    public BindStore(String dbPath) {
+        this.url = "jdbc:sqlite:" + dbPath;
+    }
+
+    private Connection open() throws SQLException {
+        Connection conn = DriverManager.getConnection(url);
+        try (Statement st = conn.createStatement()) {
+            // 和 Python 端同样的两个 PRAGMA，避免两端互锁
+            st.execute("PRAGMA journal_mode=WAL");
+            st.execute("PRAGMA busy_timeout=5000");
+        }
+        return conn;
+    }
+
+    /** 玩家在游戏内请求绑定时调用：生成验证码并写入（重发会覆盖旧码，已绑定过的行不动） */
+    public String createCode(String externalId, int ttlSeconds) throws SQLException {
+        String code = randomCode();
+        long now = System.currentTimeMillis() / 1000;
+        String sql = "INSERT INTO bindings(external_id, code, code_expires_at, created_at) VALUES(?,?,?,?) "
+                   + "ON CONFLICT(external_id) DO UPDATE SET code = excluded.code, "
+                   + "code_expires_at = excluded.code_expires_at, created_at = excluded.created_at "
+                   + "WHERE bindings.kook_id IS NULL";
+        try (Connection conn = open(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, externalId);
+            ps.setString(2, code);
+            ps.setLong(3, now + ttlSeconds);
+            ps.setLong(4, now);
+            ps.executeUpdate();
+        }
+        return code;
+    }
+
+    /** 查某个游戏账号绑定的 KOOK id；未绑定返回 null */
+    public String findKookId(String externalId) throws SQLException {
+        String sql = "SELECT kook_id FROM bindings WHERE external_id = ?";
+        try (Connection conn = open(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, externalId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("kook_id") : null;
+            }
+        }
+    }
+
+    private static String randomCode() {
+        // 只用大写字母 + 数字，去掉 0/O、1/I 这类易混字符
+        String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        java.util.Random rnd = new java.util.Random();
+        StringBuilder sb = new StringBuilder(6);
+        for (int i = 0; i < 6; i++) {
+            sb.append(alphabet.charAt(rnd.nextInt(alphabet.length())));
+        }
+        return sb.toString();
+    }
+}
+```
+
+建表两种方式，任选：
+
+- 首次运行时读 `schema.sql`，按 `;` 拆开后逐条 `Statement.executeUpdate()`
+- 或者命令行 `sqlite3 data/bind.db < src/epbot/bind/schema.sql`
+
+注意：
+
+- **数据库路径两端必须一致**（Python 端默认 `<仓库根>/data/bind.db`，可用 `EPBOT_DATA_DIR` 覆盖）
+- 验证码建议只用大写字母 + 数字：Python 端用 `UPPER(code)` 比较，这样小写输入也能兑上
+- 写完就关连接，不要长期持有 —— WAL 已经开了，开销主要在建连接，而不是每次查询
 
 ## 频道被删除后的自愈
 

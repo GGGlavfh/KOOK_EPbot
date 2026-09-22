@@ -13,6 +13,7 @@ COMMAND_USAGE = {
     'help': '/help',
     'welcome': '/welcome on | /welcome off',
     'ticket': '/ticket on | /ticket off',
+    'bind': '/bind <验证码>（在绑定频道）｜管理员：/bind channel、/bind off',
 }
 
 
@@ -51,4 +52,10 @@ ADMIN_ONLY = dict(
         Exceptions.Handler.RuleNotPassed: on_rule_not_passed,
         Exceptions.Handler.ArgLenNotMatched: on_arg_len_not_matched,
     },
+)
+
+# 普通成员可用的指令：只挂参数错误的提示，**不做**管理员准入（要不要权限由指令自己判断），
+# 所以这里没有 rules —— 非管理员的指令必须能被响应，不能像 ADMIN_ONLY 那样静默吞掉
+PUBLIC_ONLY = dict(
+    exc_handlers={Exceptions.Handler.ArgLenNotMatched: on_arg_len_not_matched},
 )

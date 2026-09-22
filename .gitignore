@@ -16,5 +16,6 @@ dist/
 # 机器人配置（含 Token，不要提交）；模板见 src/epbot/config.example.json
 config.json
 
-# 运行状态（含服务器/频道/成员 id 与工单记录，属于部署方私有数据）
+# 运行状态（含服务器/频道/成员 id、工单与绑定记录，属于部署方私有数据）
 data/*.json
+data/*.db*

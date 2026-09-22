@@ -6,5 +6,6 @@
   "webhook_port": 50000,
   "using_ws": true,
   "admin_cache_ttl": 300,
-  "admin_cache_stale_grace": 3600
+  "admin_cache_stale_grace": 3600,
+  "bind_code_ttl": 900
 }

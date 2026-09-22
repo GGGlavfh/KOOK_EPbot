@@ -27,6 +27,9 @@ DATA_DIR = Path(os.environ.get('EPBOT_DATA_DIR') or PROJECT_ROOT / 'data')
 
 WELCOME_STATE_PATH = DATA_DIR / 'welcome_channels.json'
 TICKET_STATE_PATH = DATA_DIR / 'ticket_state.json'
+# 跨平台绑定：SQLite 数据库（与 Java 端共享同一个文件，表结构见 bind/schema.sql）
+BIND_DB_PATH = DATA_DIR / 'bind.db'
+BIND_SCHEMA_PATH = PACKAGE_DIR / 'bind' / 'schema.sql'
 # 按钮/文案属于「跟着代码走的配置」，留在包内
 TICKET_CONFIG_PATH = PACKAGE_DIR / 'ticket' / 'ticket_config.json'
 
