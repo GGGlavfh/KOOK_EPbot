@@ -1,0 +1,11 @@
+# EPbot 依赖
+#
+# 安装：pip install -r requirements.txt
+# 只引用本项目（可编辑安装），会顺便装好 khl.py；装完可用 `python -m epbot` 或 `epbot` 启动。
+# 依赖声明的唯一来源是 pyproject.toml，这里不重复写版本号，避免两处不一致。
+-e .
+
+# khl.py 会自带下列间接依赖，无需手写：
+#   aiohttp        调 HTTP API、websocket 收发消息（khl/api.py、receiver.py、requester.py）
+#   pycryptodomex  webhook 模式下解密推送内容（khl/cert.py）
+#   apscheduler    定时任务（khl/task/manager.py）

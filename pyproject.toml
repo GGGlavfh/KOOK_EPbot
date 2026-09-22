@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "epbot"
+description = "基于 khl.py 的 KOOK 机器人"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["khl.py~=0.3.17"]
+dynamic = ["version"]
+
+# 装好后可以直接敲 `epbot` 启动（等价于 python -m epbot）
+[project.scripts]
+epbot = "epbot.main:run"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+# 版本号只在 epbot/__init__.py 里写一份
+version = {attr = "epbot.__version__"}
+
+[tool.setuptools.package-data]
+# 按钮/文案配置跟着代码走。config.json 故意不打包：它含 Token，由部署方自己提供
+"epbot.ticket" = ["ticket_config.json"]
+# 配置模板要随包发布，装机后照着它建 config.json
+"epbot" = ["config.example.json"]

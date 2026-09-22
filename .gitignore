@@ -1,0 +1,20 @@
+# 虚拟环境（体积大，不要提交）
+venv/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 打包产物
+build/
+dist/
+*.egg-info/
+
+# 原子写状态文件时的临时文件（进程被强杀时会残留）
+*.tmp
+
+# 机器人配置（含 Token，不要提交）；模板见 src/epbot/config.example.json
+config.json
+
+# 运行状态（含服务器/频道/成员 id 与工单记录，属于部署方私有数据）
+data/*.json

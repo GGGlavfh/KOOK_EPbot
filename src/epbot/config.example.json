@@ -1,0 +1,10 @@
+{
+  "_help": "配置模板：复制成同目录的 config.json 再填写。token 也可以留空，改用环境变量 KOOK_TOKEN 提供（见 README「配置」一节）",
+  "token": "",
+  "verify_token": "webhook verify token",
+  "encrypt_token": "webhook encrypt token",
+  "webhook_port": 50000,
+  "using_ws": true,
+  "admin_cache_ttl": 300,
+  "admin_cache_stale_grace": 3600
+}

@@ -1,0 +1,14 @@
+{
+  "menu_title": "工单系统",
+  "menu_text": "点击下方按钮创建对应的工单，我们会尽快处理。",
+  "ticket_title": "工单已创建",
+  "close_button": "关闭工单",
+  "channel_prefix": "工单-",
+  "category_name": "工单",
+  "category_id": "",
+  "buttons": [
+    { "name": "Bug", "value": "bug" },
+    { "name": "举报", "value": "report" },
+    { "name": "赞助", "value": "sponsor" }
+  ]
+}
