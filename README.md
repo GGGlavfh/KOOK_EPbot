@@ -2,17 +2,115 @@
 
 基于 [khl.py](https://github.com/TWT233/khl.py) 的 KOOK 机器人。
 
-## 环境要求
+## 快速开始
 
-- Python 3.8+
-- khl.py
+从零到机器人上线就 6 步。所有命令都在**仓库根目录**（即 `README.md` 所在的目录）执行。
+
+### 1. 前置条件
+
+| 需要 | 说明 |
+| --- | --- |
+| Python 3.8+ | 安装时记得勾上「Add Python to PATH」。本机 `venv/` 用 **3.14.7** 实测可用 |
+| 一个机器人 Token | 在 [KOOK 开发者后台](https://developer.kookapp.cn/app/index) → 应用 → 机器人 里获取 |
+| 能访问 PyPI | 首次装依赖需要联网 |
+
+### 2. 拿到代码
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/GGGlavfh/KOOK_EPbot.git
+cd KOOK_EPbot
 ```
 
-`requirements.txt` 里只有一行 `-e .`：会把本项目以「可编辑」方式装上，顺便装好 khl.py。
-真正的依赖声明在 `pyproject.toml`（单一来源），装完就能用 `python -m epbot` 启动。
+不用 git 也行：仓库页点绿色 `Code` → `Download ZIP`，解压后进到那个目录。
+
+### 3. 建虚拟环境并装依赖
+
+**推荐用虚拟环境**：依赖和系统 Python 隔开，以后不想用了直接删 `venv/` 就等于卸载干净。
+
+```powershell
+# Windows PowerShell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+```bash
+# Linux / macOS
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+装对了的话，命令行提示符前面会出现 **`(venv)`** —— 表示接下来所有命令都跑在这个环境里。
+
+> **为什么写 `python -m pip` 而不是直接敲 `pip`**：能确保装进虚拟环境，而不是装到全局 Python（否则会出现「明明装了却 import 不到」）。
+>
+> **PowerShell 报 `Activate.ps1 cannot be loaded`（禁止运行脚本）**：执行一次
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` 再重试；或者改用 cmd 里的
+> `venv\Scripts\activate.bat`。
+>
+> **不想用虚拟环境**：直接 `python -m pip install -r requirements.txt` 也能跑，但会和其它 Python 项目
+> 互相干扰，不推荐。
+
+`requirements.txt` 里只有一行 `-e .`（把本项目以可编辑方式装上，顺便装 khl.py），依赖声明的唯一来源是 `pyproject.toml`。装完还会多出一个 `epbot` 命令，它和 `python -m epbot` 完全等价。
+
+### 4. 配置 Token
+
+仓库里**没有** `config.json`（它含 Token，已被 `.gitignore` 排除），先从模板复制一份：
+
+```powershell
+Copy-Item src/epbot/config.example.json src/epbot/config.json   # Windows
+# cp src/epbot/config.example.json src/epbot/config.json        # Linux / macOS
+```
+
+然后编辑 `src/epbot/config.json` 把 `token` 填上。各字段含义见下面的[配置项](#配置项)。
+
+> 不想把 Token 写进文件，可以改用环境变量（优先级高于配置文件）：
+>
+> ```powershell
+> $env:KOOK_TOKEN = "你的 Token"   # 只在当前窗口有效
+> setx KOOK_TOKEN "你的 Token"    # 永久写入用户环境变量，需重开窗口
+> ```
+
+### 5. 启动
+
+```powershell
+python -m epbot
+```
+
+看到 `机器人正在连接 KOOK...` 且后面没有报错，就是上线了。`Ctrl + C` 停止。
+
+> 启动前确认提示符里有 `(venv)`；没有的话回第 3 步。实在不想激活，也可以直接用
+> 虚拟环境里的解释器跑：`.\venv\Scripts\python.exe -m epbot`（Linux：`./venv/bin/python -m epbot`）。
+
+### 6. 让它一直在后台跑（可选）
+
+上面的方式一关窗口就停了。想长期挂着，看系统选一种：
+
+**Windows** —— 用「任务计划程序」开机自启：新建任务 → 触发器选「登录时」→ 操作选「启动程序」，
+程序填 `<项目目录>\venv\Scripts\python.exe`，参数填 `-m epbot`，起始于填 `<项目目录>`。
+
+**Linux** —— `screen`（推荐，便于随时查看日志）：
+
+```bash
+screen -S epbot
+python -m epbot      # 启动后按 Ctrl+A 再按 D 挂起，窗口关了也还在跑
+screen -r epbot      # 需要时连回来
+```
+
+或者用 `nohup`：
+
+```bash
+nohup python -m epbot > epbot.log 2>&1 &
+```
+
+### 以后更新代码
+
+```bash
+git pull
+python -m pip install -r requirements.txt   # 只有依赖变动时才需要
+python -m epbot
+```
 
 ## 文件位置
 
@@ -24,16 +122,9 @@ pip install -r requirements.txt
 | 运行状态（欢迎开关、工单记录） | `data/` |
 | 工单按钮与文案 | `src/epbot/ticket/ticket_config.json` |
 
-## 配置
+## 配置项
 
-仓库里**没有** `config.json` —— 它含 Token，已被 `.gitignore` 排除。首次使用先从模板复制一份：
-
-```powershell
-Copy-Item src/epbot/config.example.json src/epbot/config.json   # Windows
-# cp src/epbot/config.example.json src/epbot/config.json        # Linux / macOS
-```
-
-然后编辑 `src/epbot/config.json`：
+编辑 `src/epbot/config.json`（怎么创建见[快速开始](#快速开始)第 4 步）：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -45,35 +136,24 @@ Copy-Item src/epbot/config.example.json src/epbot/config.json   # Windows
 | `admin_cache_ttl` | number | 角色信息的缓存秒数（软上限），默认 `300`，用于减少 API 请求 |
 | `admin_cache_stale_grace` | number | 刷新失败时旧权限缓存最多还能再用几秒（硬上限），默认 `3600`；超过就按「不是管理员」处理（失败关闭） |
 
-> ⚠️ `token` 属于敏感凭证，只应放在环境变量或本地文件里，**不要提交到 Git 仓库或分享给他人**。
+> ⚠️ `token` 属于敏感凭证，**不要提交到 Git 仓库或分享给他人**。`.gitignore` 里已经排除了
+> `config.json`，请不要去改这条规则。
 >
-> 推荐用环境变量提供（Windows PowerShell）：
+> 启动时**优先读环境变量 `KOOK_TOKEN`**，读不到才回落到 `config.json` 的 `token`，两种方式选一种就行。
 >
-> ```powershell
-> $env:KOOK_TOKEN = "你的 Token"   # 当前窗口有效
-> setx KOOK_TOKEN "你的 Token"    # 永久写入用户环境变量，需重开窗口
-> ```
->
-> 启动时优先读 `KOOK_TOKEN`，读不到才回落到 `config.json` 的 `token`。
->
-> 配置文件和状态文件的位置也都能用环境变量改（生产部署时很有用，可以把可写的状态
-> 挪到代码目录之外）：`EPBOT_CONFIG` 指定配置文件路径，`EPBOT_DATA_DIR` 指定状态文件目录。
+> 还可以用环境变量挪动文件位置（生产部署有用，可以把可写的状态文件挪出代码目录）：
+> `EPBOT_CONFIG` 指定配置文件路径，`EPBOT_DATA_DIR` 指定状态文件目录。
 
-## 运行
+## 常见问题
 
-在**仓库根目录**（即 `README.md` 所在的目录）执行：
-
-```bash
-python -m epbot
-```
-
-装包时会顺带生成一个 `epbot` 命令，敲它也是一样的：
-
-```bash
-epbot
-```
-
-保持窗口开着，机器人就会一直在线。`Ctrl + C` 退出。
+| 现象 | 处理 |
+| --- | --- |
+| 启动时打印 `[warn] 找不到配置文件 ...` | 还没建 `config.json`，按[快速开始](#快速开始)第 4 步复制模板 |
+| 启动时打印 `[warn] 未配置 Token` | `config.json` 里的 `token` 是空的，或者环境变量 `KOOK_TOKEN` 没设置 |
+| `ModuleNotFoundError: No module named 'epbot'` | 提示符里没有 `(venv)`，依赖没装进当前解释器。回第 3 步激活并重装；或直接用虚拟环境的解释器：`.\venv\Scripts\python.exe -m epbot` |
+| PowerShell 报 `Activate.ps1 cannot be loaded` | 见[快速开始](#快速开始)第 3 步的说明 |
+| 发指令机器人不回应 | 只认**服主**和带「管理员」权限的角色，且**私聊不响应**。刚改过角色权限的话最多等 5 分钟（缓存）才生效 |
+| 想换台机器部署 | 整个目录拷过去即可；`venv/` 建议重新建（里面写死了路径），想保留工单记录就把 `data/` 一起拷 |
 
 ## 管理员
 

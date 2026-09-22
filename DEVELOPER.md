@@ -16,7 +16,10 @@ pip install -r requirements.txt
 `aiohttp` / `pycryptodomex` / `apscheduler` 都由它自动带入，不手写以免和 SDK 声明的版本打架。
 
 装包时会按 `[project.scripts]` 生成 `epbot` 控制台命令（指向 `epbot.main:run`），
-所以 `epbot` 与 `python -m epbot` 等价。项目自带的 `venv/` 实测 **Python 3.14.7** 可以正常运行。
+所以 `epbot` 与 `python -m epbot` 等价。
+
+`venv/` **不在仓库里**（已被 `.gitignore` 排除），每个人自己建；创建与激活的完整步骤见
+README 的「快速开始」第 3 步。本机实测 **Python 3.14.7** 可以正常运行。
 
 ## 项目结构
 
