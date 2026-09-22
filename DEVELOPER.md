@@ -36,7 +36,7 @@ KOOK_EPbot-1.0/
 ├── data/                # 运行时可写数据（不在包里）
 │   ├── welcome_channels.json  # 欢迎开关 {guild_id: channel_id}
 │   ├── ticket_state.json      # 面板频道与工单归属
-│   └── bind.db                # 跨平台绑定（SQLite，游戏服与机器人共写同一文件）
+│   └── bind.db                # 跨平台绑定（SQLite）；接了游戏服后由 EPBOT_BIND_DB 指到插件目录
 └── src/
     └── epbot/
         ├── __init__.py   # 包说明 + __version__（版本号唯一来源）
@@ -429,16 +429,20 @@ khl.py 派发消息/事件是 `asyncio.ensure_future`，**多个用户同时点�
 
 ### 两个进程怎么看到同一个库
 
-SQLite 是一个文件，两边必须打开**同一个绝对路径**。两边的工作目录不同（机器人从仓库根启动，
-MC 插件从服务端目录启动），所以：
+约定：**库放在 MC 插件目录里**，机器人靠 `EPBOT_BIND_DB` 指过去 —— 插件自包含，
+换个机器人部署也不用动插件配置。
 
-| 摆法 | 机器人端 | Java 插件配置 |
-| --- | --- | --- |
-| 库放 MC 插件目录 | `set EPBOT_BIND_DB=D:\Minecraft\server\plugins\EPBind\bind.db` | `D:/Minecraft/server/plugins/EPBind/bind.db` |
-| 库留在机器人这边 | 默认，不用配 | `C:/KOOK_EPbot-1.0/data/bind.db` |
+| | 值 |
+| --- | --- |
+| Java 插件配置 | `D:/Minecraft/server/plugins/EPBind/bind.db` |
+| 机器人端（启动前） | `set EPBOT_BIND_DB=D:\Minecraft\server\plugins\EPBind\bind.db` |
 
-第一种是用 `EPBOT_BIND_DB` 单独改这一个文件的路径（`EPBOT_DATA_DIR` 会连欢迎/工单状态一起搬走）；
-不设的话默认就是 `<仓库根>/data/bind.db`。
+SQLite 是一个文件，两边必须打开**同一个绝对路径**：两个进程的工作目录不同（机器人从仓库根启动，
+MC 插件从服务端目录启动），所以谁都不能写相对路径 —— 那会各自解析到不同位置，一个在写 A、
+另一个在读 B，表现就是「不管怎么试都说验证码不对」。库所在目录不存在时 `_connect()` 会自动创建。
+
+`EPBOT_BIND_DB` 只改这一个文件；想搬整个数据目录（欢迎开关、工单记录）用 `EPBOT_DATA_DIR`，
+但不要为了这个场景去用它。不设 `EPBOT_BIND_DB` 时默认仍是 `<仓库根>/data/bind.db`（还没接游戏服时的状态）。
 
 > 排查口头：如果「不管怎么试都说验证码不对」，先确认两边指向的是同一个文件（
 > 看文件修改时间、或往一边插一行看另一边能不能读到），绝大多数都错在这里。
@@ -521,8 +525,8 @@ import java.sql.*;
 public class BindStore {
     private final String url;
 
-    /** dbPath 必须是**绝对路径**，而且要指向 Python 端看到的同一个文件；
-     *  默认是 <仓库根>/data/bind.db，或用 EPBOT_BIND_DB 指到插件目录 */
+    /** dbPath 必须是**绝对路径**：库放在插件目录下（如 D:/Minecraft/server/plugins/EPBind/bind.db），
+     *  机器人那边用 EPBOT_BIND_DB 指向同一个文件 */
     public BindStore(String dbPath) {
         this.url = "jdbc:sqlite:" + dbPath;
     }
@@ -586,8 +590,8 @@ public class BindStore {
 
 注意：
 
-- **数据库路径两端必须一致，而且要用绝对路径**（Python 端默认 `<仓库根>/data/bind.db`，
-  可用 `EPBOT_BIND_DB` 单独改；两个进程的工作目录不同，写相对路径会各读各的文件）
+- **数据库路径两端必须一致，而且要用绝对路径**（库放插件目录，机器人用 `EPBOT_BIND_DB` 指过来；
+  不设该变量时默认 `<仓库根>/data/bind.db`。两个进程工作目录不同，写相对路径会各读各的文件）
 - Java 里写路径用 `D:/Minecraft/...`（正斜杠）或 `D:\\Minecraft\\...`（反斜杠双写），别写单个 `\`
 - 验证码建议只用大写字母 + 数字：Python 端用 `UPPER(code)` 比较，这样小写输入也能兑上
 - 写完就关连接，不要长期持有 —— WAL 已经开了，开销主要在建连接，而不是每次查询
