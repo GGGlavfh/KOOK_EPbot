@@ -7,6 +7,7 @@
 | --- | --- | --- |
 | 机器人配置 | `src/epbot/config.json` | 环境变量 `EPBOT_CONFIG` |
 | 状态文件 | 仓库根 `data/` | 环境变量 `EPBOT_DATA_DIR` |
+| 绑定数据库 | `data/bind.db` | 环境变量 `EPBOT_BIND_DB`（只影响这一个文件） |
 
 状态文件是可写的运行时数据，配置里含 Token，所以生产部署时可以靠这两个环境变量
 把它们挪到包目录之外（例如只读的代码目录 + 可写的 `data/`）。
@@ -28,7 +29,8 @@ DATA_DIR = Path(os.environ.get('EPBOT_DATA_DIR') or PROJECT_ROOT / 'data')
 WELCOME_STATE_PATH = DATA_DIR / 'welcome_channels.json'
 TICKET_STATE_PATH = DATA_DIR / 'ticket_state.json'
 # 跨平台绑定：SQLite 数据库（与 Java 端共享同一个文件，表结构见 bind/schema.sql）
-BIND_DB_PATH = DATA_DIR / 'bind.db'
+# 用 EPBOT_BIND_DB 可以单独把它指到游戏服那边（插件目录），而不用搬走整个 data/
+BIND_DB_PATH = Path(os.environ.get('EPBOT_BIND_DB') or DATA_DIR / 'bind.db')
 BIND_SCHEMA_PATH = PACKAGE_DIR / 'bind' / 'schema.sql'
 # 按钮/文案属于「跟着代码走的配置」，留在包内
 TICKET_CONFIG_PATH = PACKAGE_DIR / 'ticket' / 'ticket_config.json'

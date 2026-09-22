@@ -120,6 +120,7 @@ python -m epbot
 | 配置模板（无敏感信息，随仓库提供） | `src/epbot/config.example.json` |
 | 机器人配置（含 Token，**需自己创建**） | `src/epbot/config.json` |
 | 运行状态（欢迎开关、工单记录） | `data/` |
+| 绑定数据库（与游戏服共享） | `data/bind.db`，可用环境变量 `EPBOT_BIND_DB` 改 |
 | 工单按钮与文案 | `src/epbot/ticket/ticket_config.json` |
 
 ## 配置项
@@ -143,7 +144,8 @@ python -m epbot
 > 启动时**优先读环境变量 `KOOK_TOKEN`**，读不到才回落到 `config.json` 的 `token`，两种方式选一种就行。
 >
 > 还可以用环境变量挪动文件位置（生产部署有用，可以把可写的状态文件挪出代码目录）：
-> `EPBOT_CONFIG` 指定配置文件路径，`EPBOT_DATA_DIR` 指定状态文件目录。
+> `EPBOT_CONFIG` 指定配置文件路径，`EPBOT_DATA_DIR` 指定状态文件目录，
+> `EPBOT_BIND_DB` 单独指定绑定数据库（见[跳平台绑定](#跳平台绑定)）。
 
 ## 常见问题
 
@@ -266,7 +268,29 @@ python -m epbot
 
 ### 数据放在哪
 
-绑定数据存在 `data/bind.db`（SQLite），**游戏服和机器人读写同一个文件**，所以两边必须在同一台机器上。
+绑定数据就是一个 SQLite 文件（默认 `data/bind.db`），**游戏服插件和机器人读写的是同一个文件**。
+库放哪边都行，只要两边填的路径**一字不差**：
+
+**方案 A：库放 MC 插件目录**（插件自包含，推荐）
+
+```
+机器人这边（启动前设置，指向 MC 那边的同一个文件）：
+set EPBOT_BIND_DB=D:\Minecraft\server\plugins\EPBind\bind.db
+
+Java 插件配置里填同一个：
+D:/Minecraft/server/plugins/EPBind/bind.db
+```
+
+**方案 B：库留在机器人这边**
+
+Java 插件配置里填机器人的绝对路径，例如 `C:/KOOK_EPbot-1.0/data/bind.db`。
+
+> ⚠️ **两边都必须用绝对路径。**
+> 两个进程的「当前目录」不一样：机器人从仓库根启动，MC 插件从服务端目录启动。
+> 如果都写相对路径 `data/bind.db`，就会各自解析到不同位置 —— 一个在写 A 文件、另一个在读 B 文件，
+> 表现就是「不管怎么试，机器人都说验证码不对」。（Java 里写 `D:/...` 或 `D:\\...` 都可以，
+> 字符串里用反斜杠要写成双写。）
+
 表结构（即两端之间的接口）在 `src/epbot/bind/schema.sql`，可以直接把这个文件给 Java 端用；
 Java 端的接入示例见 [DEVELOPER.md](./DEVELOPER.md)。
 

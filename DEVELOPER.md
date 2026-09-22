@@ -423,6 +423,26 @@ khl.py 派发消息/事件是 `asyncio.ensure_future`，**多个用户同时点�
 | `bind_db.py` | 数据层，唯一碰 SQL 的地方；`claim()` 封装了整个兑换过程 |
 | `bind_manager.py` | `/bind` 指令与业务回复 |
 
+> ⚠️ 上表后两个 `.py` 是 **Python 端的代码**，Java 端不能也不该用它 —— 两者只通过
+> **数据库文件本身**耦合。Java 端需要的是：① `schema.sql`（建表），② 自己的 JDBC 代码
+> （示例见下文「Java 端接入示例」），别的什么都不用要。
+
+### 两个进程怎么看到同一个库
+
+SQLite 是一个文件，两边必须打开**同一个绝对路径**。两边的工作目录不同（机器人从仓库根启动，
+MC 插件从服务端目录启动），所以：
+
+| 摆法 | 机器人端 | Java 插件配置 |
+| --- | --- | --- |
+| 库放 MC 插件目录 | `set EPBOT_BIND_DB=D:\Minecraft\server\plugins\EPBind\bind.db` | `D:/Minecraft/server/plugins/EPBind/bind.db` |
+| 库留在机器人这边 | 默认，不用配 | `C:/KOOK_EPbot-1.0/data/bind.db` |
+
+第一种是用 `EPBOT_BIND_DB` 单独改这一个文件的路径（`EPBOT_DATA_DIR` 会连欢迎/工单状态一起搬走）；
+不设的话默认就是 `<仓库根>/data/bind.db`。
+
+> 排查口头：如果「不管怎么试都说验证码不对」，先确认两边指向的是同一个文件（
+> 看文件修改时间、或往一边插一行看另一边能不能读到），绝大多数都错在这里。
+
 ### 数据流
 
 1. **Java 端**生成验证码 → 写入一行（`external_id` + `code`，`kook_id` 留空）
@@ -501,7 +521,8 @@ import java.sql.*;
 public class BindStore {
     private final String url;
 
-    /** dbPath 要和 Python 端一致，默认是 <仓库根>/data/bind.db */
+    /** dbPath 必须是**绝对路径**，而且要指向 Python 端看到的同一个文件；
+     *  默认是 <仓库根>/data/bind.db，或用 EPBOT_BIND_DB 指到插件目录 */
     public BindStore(String dbPath) {
         this.url = "jdbc:sqlite:" + dbPath;
     }
@@ -565,7 +586,9 @@ public class BindStore {
 
 注意：
 
-- **数据库路径两端必须一致**（Python 端默认 `<仓库根>/data/bind.db`，可用 `EPBOT_DATA_DIR` 覆盖）
+- **数据库路径两端必须一致，而且要用绝对路径**（Python 端默认 `<仓库根>/data/bind.db`，
+  可用 `EPBOT_BIND_DB` 单独改；两个进程的工作目录不同，写相对路径会各读各的文件）
+- Java 里写路径用 `D:/Minecraft/...`（正斜杠）或 `D:\\Minecraft\\...`（反斜杠双写），别写单个 `\`
 - 验证码建议只用大写字母 + 数字：Python 端用 `UPPER(code)` 比较，这样小写输入也能兑上
 - 写完就关连接，不要长期持有 —— WAL 已经开了，开销主要在建连接，而不是每次查询
 
